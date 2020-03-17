@@ -7,12 +7,22 @@
 #include <condition_variable>
 #include <future>
 #include <vector>
+#include <stdlib.h>
 
 using namespace std;
 
 class Request {
 public:
-	Request() : a(0) {};
+	Request() : a(0) {}
+	Request(int new_a) : a(new_a) {}
+
+	int GetA() {
+		return a;
+	}
+	void SetA(int na) {
+		a = na;
+	}
+private:
 	int a;
 };
 
@@ -29,10 +39,6 @@ public:
 private:
 	bool stopSignal;
 };
-
-void ProcessRequest(Request* request, Stopper stopSignal) {
-
-}
 
 class ThreadPool {
 public:
@@ -60,9 +66,8 @@ private:
 	condition_variable event;
 	mutex eventmutex;
 	queue<Task> Tasks;
-	Stopper stopSignal{};
-	Request request;
-	//_Binder<std::_Unforced, void (*)(Request * request, Stopper stopSignal), const std::_Ph<1>&, const std::_Ph<2>&>  f1 = bind(&ProcessRequest, placeholders::_1, placeholders::_2);
+	Stopper stopSignal;
+
 	void start(size_t amThreads) {
 		for (auto i = 0u; i < amThreads; ++i) {
 			Pool.emplace_back([=] {
@@ -98,17 +103,32 @@ private:
 	}
 };
 
-void add(Request* request, Stopper stopSignal)
-{
-	//return 5;
+	mutex mm;
+void ProcessRequest(Request* request, Stopper stopSignal) {
+	this_thread::sleep_for(chrono::milliseconds(500));
+	mm.lock();
+	cout << request->GetA() << endl;
+	mm.unlock();
 }
 
+Request r;
 
+Request* GetRequest() {
+	r.SetA(rand() % 100 + 1);
+	return &r;
+}
 
 int main() {
-	ThreadPool{ 10 };
-	/*auto a = 5;
-	auto f1 = bind(&ProcessRequest, placeholders::_1, placeholders::_2);
-	auto add_func = bind(&add, placeholders::_1, placeholders::_2);*/
+	using namespace std::placeholders;
+	ThreadPool pool{ 10 };
+	Request *request;
+	Stopper stopSignal;
+	auto start = chrono::high_resolution_clock::now() + chrono::seconds(30);
+
+	while (chrono::high_resolution_clock::now() < start) {
+		request = GetRequest();
+		auto f1 = bind(ProcessRequest, request, stopSignal);
+		pool.enqueue(f1);		
+	}
 	return 0;
 }
